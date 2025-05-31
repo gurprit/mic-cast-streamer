@@ -29,15 +29,15 @@
           const source = audioCtx.createMediaStreamSource(stream);
 
           // 🔊 Live mic monitor (echo preview)
-          const preview = audioCtx.createGain();
-          preview.gain.value = 1;
-          source.connect(preview);
-          preview.connect(audioCtx.destination);
-          console.log("Live mic preview enabled");
+          //const preview = audioCtx.createGain();
+          //preview.gain.value = 1;
+          //source.connect(preview);
+          //preview.connect(audioCtx.destination);
+          //console.log("Live mic preview enabled");
 
           const processor = audioCtx.createScriptProcessor(1024, 1, 1);
           source.connect(processor);
-          processor.connect(audioCtx.destination);
+          //processor.connect(audioCtx.destination);
 
           processor.onaudioprocess = (e) => {
             if (ws.readyState !== WebSocket.OPEN) return;
