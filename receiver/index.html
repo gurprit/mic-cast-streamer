@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html>
-<head><title>Mic Receiver</title></head>
+<head>
+  <title>Mic Receiver</title>
+</head>
 <body>
   <h1>Mic Receiver</h1>
   <script>
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
-
     ws.binaryType = "arraybuffer";
 
     ws.onmessage = async (event) => {
@@ -17,7 +18,7 @@
         source.connect(audioCtx.destination);
         source.start();
       } catch (e) {
-        console.error(\"Error decoding audio\", e);
+        console.error("Error decoding audio", e);
       }
     };
   </script>
