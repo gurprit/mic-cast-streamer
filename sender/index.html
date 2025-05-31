@@ -11,31 +11,43 @@
     let ws;
     let audioCtx;
 
-    document.getElementById("startBtn").addEventListener("click", async () => {
-      // ✅ Resume or create AudioContext immediately on user gesture
-      if (!audioCtx) audioCtx = new AudioContext();
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
+    document.getElementById("startBtn").addEventListener("click", () => {
+      // ✅ Create and resume AudioContext immediately on user gesture
+      audioCtx = new AudioContext();
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+          console.log("AudioContext resumed");
+          startStreaming();
+        });
+      } else {
+        startStreaming();
+      }
+    });
 
-      // ✅ Establish WebSocket connection
+    async function startStreaming() {
       ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
 
       ws.onopen = async () => {
         console.log("WebSocket connected");
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const source = audioCtx.createMediaStreamSource(stream);
-        const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const source = audioCtx.createMediaStreamSource(stream);
+          const processor = audioCtx.createScriptProcessor(2048, 1, 1);
 
-        source.connect(processor);
-        processor.connect(audioCtx.destination);
+          source.connect(processor);
+          processor.connect(audioCtx.destination);
 
-        processor.onaudioprocess = (e) => {
-          if (ws.readyState !== WebSocket.OPEN) return;
+          processor.onaudioprocess = (e) => {
+            if (ws.readyState !== WebSocket.OPEN) return;
 
-          const input = e.inputBuffer.getChannelData(0);
-          const wavBuffer = encodeWAV(input, audioCtx.sampleRate);
-          ws.send(wavBuffer);
-        };
+            const input = e.inputBuffer.getChannelData(0);
+            const wavBuffer = encodeWAV(input, audioCtx.sampleRate);
+            ws.send(wavBuffer);
+          };
+        } catch (err) {
+          console.error("Error accessing microphone:", err);
+        }
       };
 
       ws.onerror = (err) => {
@@ -45,7 +57,7 @@
       ws.onclose = () => {
         console.warn("WebSocket closed");
       };
-    });
+    }
 
     function encodeWAV(samples, sampleRate) {
       const buffer = new ArrayBuffer(44 + samples.length * 2);
@@ -61,13 +73,13 @@
       view.setUint32(4, 36 + samples.length * 2, true);
       writeString(view, 8, 'WAVE');
       writeString(view, 12, 'fmt ');
-      view.setUint32(16, 16, true); // Subchunk1Size
-      view.setUint16(20, 1, true);  // AudioFormat (1 = PCM)
-      view.setUint16(22, 1, true);  // NumChannels (1 = mono)
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); // PCM
+      view.setUint16(22, 1, true); // Mono
       view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true); // ByteRate
-      view.setUint16(32, 2, true);  // BlockAlign
-      view.setUint16(34, 16, true); // BitsPerSample
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
       writeString(view, 36, 'data');
       view.setUint32(40, samples.length * 2, true);
 
