@@ -6,10 +6,15 @@
 <body>
   <h1>Mic Sender</h1>
   <button onclick="start()">Start Streaming</button>
-  <script>
-    let ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
+<script>
+  let ws;
 
-    async function start() {
+  async function start() {
+    ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
+
+    ws.onopen = async () => {
+      console.log("WebSocket connected");
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const audioCtx = new AudioContext();
       const source = audioCtx.createMediaStreamSource(stream);
@@ -19,6 +24,11 @@
       processor.connect(audioCtx.destination);
 
       processor.onaudioprocess = (e) => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          console.warn("WebSocket not open");
+          return;
+        }
+
         const input = e.inputBuffer.getChannelData(0);
         const int16 = new Int16Array(input.length);
         for (let i = 0; i < input.length; i++) {
@@ -26,7 +36,17 @@
         }
         ws.send(int16.buffer);
       };
-    }
-  </script>
+    };
+
+    ws.onerror = (err) => {
+      console.error("WebSocket error", err);
+    };
+
+    ws.onclose = () => {
+      console.warn("WebSocket connection closed");
+    };
+  }
+</script>
+
 </body>
 </html>
