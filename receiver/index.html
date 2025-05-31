@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mic Receiver (WebM)</title>
+  <title>Mic Receiver (WAV via <audio>)</title>
 </head>
 <body>
   <h1>Mic Receiver</h1>
@@ -9,11 +9,7 @@
 
   <script>
     const audio = document.getElementById('player');
-    const mime = 'audio/webm; codecs=opus';
-
-    if (!MediaSource.isTypeSupported(mime)) {
-      alert('Your browser does not support WebM audio streaming');
-    }
+    const mime = 'audio/wav';
 
     const mediaSource = new MediaSource();
     audio.src = URL.createObjectURL(mediaSource);
@@ -32,7 +28,12 @@
 
       function push() {
         if (queue.length > 0 && !sourceBuffer.updating) {
-          sourceBuffer.appendBuffer(queue.shift());
+          const chunk = queue.shift();
+          try {
+            sourceBuffer.appendBuffer(chunk);
+          } catch (e) {
+            console.error("Append error", e);
+          }
         }
       }
 
