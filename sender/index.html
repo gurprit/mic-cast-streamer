@@ -12,8 +12,12 @@
 
   <button id="enableAudioBtn">Enable Audio</button>
   <button id="startStreamingBtn" disabled>Start Streaming</button>
-
   <script>
+
+  if (!sessionStorage.getItem("audioUnlocked")) {
+    window.location.href = "unlock.html";
+  }
+
     let ws;
     let audioCtx;
 

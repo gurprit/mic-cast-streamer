@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Unlock Audio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  <h1>🔓 Tap to Enable Audio</h1>
+  <button id="unlockBtn">Enable Audio</button>
+
+  <script>
+    let audioCtx;
+
+    document.getElementById("unlockBtn").addEventListener("click", () => {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioCtx.resume().then(() => {
+        console.log("Audio unlocked, redirecting...");
+        // Store context in session so it survives redirect
+        sessionStorage.setItem("audioUnlocked", "true");
+        window.location.href = "index.html";
+      });
+    });
+  </script>
+</body>
+</html>
