@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mic Sender (WAV, low latency)</title>
+  <title>Mic Sender (Debugging)</title>
 </head>
 <body>
   <h1>Mic Sender</h1>
@@ -14,6 +14,7 @@
     document.getElementById("startBtn").addEventListener("click", () => {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       audioCtx.resume().then(() => {
+        console.log("AudioContext resumed");
         startStreaming();
       });
     });
@@ -22,9 +23,11 @@
       ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
 
       ws.onopen = () => {
+        console.log("WebSocket connected to server");
+
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
           const source = audioCtx.createMediaStreamSource(stream);
-          const processor = audioCtx.createScriptProcessor(1024, 1, 1); // Lower buffer = lower latency
+          const processor = audioCtx.createScriptProcessor(1024, 1, 1);
 
           source.connect(processor);
           processor.connect(audioCtx.destination);
@@ -35,8 +38,19 @@
             const input = e.inputBuffer.getChannelData(0);
             const wavBuffer = encodeWAV(input, audioCtx.sampleRate);
             ws.send(wavBuffer);
+            console.log("Sending chunk of size:", input.length);
           };
+        }).catch((err) => {
+          console.error("Microphone access error:", err);
         });
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+      };
+
+      ws.onclose = () => {
+        console.warn("WebSocket closed");
       };
     }
 
