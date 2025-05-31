@@ -14,8 +14,6 @@
     const ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
     ws.binaryType = "arraybuffer";
 
-    sink.srcObject = dest.stream;
-
     // Confirm AudioContext and test sound path
     audioCtx.resume().then(() => {
       console.log("AudioContext resumed");
@@ -43,7 +41,7 @@
 
         const source = audioCtx.createBufferSource();
         source.buffer = buffer;
-        source.connect(dest);
+        source.connect(audioCtx.destination);
         source.start();
         console.log("Playback started");
       } catch (err) {
