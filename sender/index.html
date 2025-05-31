@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mic Sender</title>
+  <title>Mic Sender (WebM)</title>
 </head>
 <body>
   <h1>Mic Sender</h1>
@@ -9,68 +9,25 @@
 
   <script>
     let ws;
-    let audioCtx;
 
     document.getElementById("startBtn").addEventListener("click", () => {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      audioCtx.resume().then(() => {
-        startStreaming();
+      navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+        ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
+        ws.binaryType = "arraybuffer";
+
+        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+            e.data.arrayBuffer().then(buffer => {
+              ws.send(buffer);
+            });
+          }
+        };
+
+        mediaRecorder.start(250); // Send chunk every 250ms
       });
     });
-
-    function startStreaming() {
-      ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
-
-      ws.onopen = () => {
-        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-          const source = audioCtx.createMediaStreamSource(stream);
-          const processor = audioCtx.createScriptProcessor(2048, 1, 1); // stable buffer size
-
-          source.connect(processor);
-          processor.connect(audioCtx.destination);
-
-          processor.onaudioprocess = (e) => {
-            if (ws.readyState !== WebSocket.OPEN) return;
-
-            const input = e.inputBuffer.getChannelData(0);
-            const wavBuffer = encodeWAV(input, audioCtx.sampleRate);
-            ws.send(wavBuffer);
-          };
-        });
-      };
-    }
-
-    function encodeWAV(samples, sampleRate) {
-      const buffer = new ArrayBuffer(44 + samples.length * 2);
-      const view = new DataView(buffer);
-
-      function writeString(view, offset, string) {
-        for (let i = 0; i < string.length; i++) {
-          view.setUint8(offset + i, string.charCodeAt(i));
-        }
-      }
-
-      writeString(view, 0, 'RIFF');
-      view.setUint32(4, 36 + samples.length * 2, true);
-      writeString(view, 8, 'WAVE');
-      writeString(view, 12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true); // PCM
-      view.setUint16(22, 1, true); // Mono
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true);
-      view.setUint16(32, 2, true);
-      view.setUint16(34, 16, true);
-      writeString(view, 36, 'data');
-      view.setUint32(40, samples.length * 2, true);
-
-      for (let i = 0; i < samples.length; i++) {
-        const s = Math.max(-1, Math.min(1, samples[i]));
-        view.setInt16(44 + i * 2, s * 0x7FFF, true);
-      }
-
-      return buffer;
-    }
   </script>
 </body>
 </html>

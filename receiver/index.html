@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mic Receiver (via <audio>)</title>
+  <title>Mic Receiver (WebM)</title>
 </head>
 <body>
   <h1>Mic Receiver</h1>
@@ -9,10 +9,10 @@
 
   <script>
     const audio = document.getElementById('player');
-    const mime = 'audio/wav; codecs=1'; // PCM
+    const mime = 'audio/webm; codecs=opus';
 
     if (!MediaSource.isTypeSupported(mime)) {
-      alert('Your browser does not support WAV audio streaming');
+      alert('Your browser does not support WebM audio streaming');
     }
 
     const mediaSource = new MediaSource();
@@ -32,8 +32,7 @@
 
       function push() {
         if (queue.length > 0 && !sourceBuffer.updating) {
-          const chunk = queue.shift();
-          sourceBuffer.appendBuffer(chunk);
+          sourceBuffer.appendBuffer(queue.shift());
         }
       }
 
