@@ -9,14 +9,14 @@
 <script>
   let ws;
 
-  async function start() {
+async function start() {
+    const audioCtx = new AudioContext(); // ✅ Moved here to ensure user gesture
     ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
 
     ws.onopen = async () => {
       console.log("WebSocket connected");
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const audioCtx = new AudioContext();
       const source = audioCtx.createMediaStreamSource(stream);
       const processor = audioCtx.createScriptProcessor(2048, 1, 1);
 
@@ -32,7 +32,6 @@
       };
     };
   }
-
   function encodeWAV(samples, sampleRate) {
     const buffer = new ArrayBuffer(44 + samples.length * 2);
     const view = new DataView(buffer);
