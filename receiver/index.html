@@ -1,31 +1,39 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mic Receiver (AudioContext)</title>
+  <title>Mic Receiver (Autoplay Safe)</title>
 </head>
 <body>
   <h1>Mic Receiver</h1>
+  <audio id="sink" autoplay></audio>
+
   <script>
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const dest = audioCtx.createMediaStreamDestination();
     const ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
     ws.binaryType = "arraybuffer";
 
-    // Attempt resume on load (Chromecast and desktop workaround)
-    audioCtx.resume().then(() => {
-      console.log("AudioContext resumed");
-    });
+    // Attach audio output to an <audio> element (Chrome allows autoplay here)
+    document.getElementById('sink').srcObject = dest.stream;
 
     ws.onmessage = async (event) => {
       try {
-        const buffer = await audioCtx.decodeAudioData(event.data.slice(0)); // Copy required by Chrome
+        const buffer = await audioCtx.decodeAudioData(event.data.slice(0)); // copy buffer
         const source = audioCtx.createBufferSource();
         source.buffer = buffer;
-        source.connect(audioCtx.destination);
+        source.connect(dest);
         source.start();
       } catch (err) {
         console.error("Error decoding audio:", err);
       }
     };
+
+    // Force resume — Chromecast often honors it with sink setup
+    audioCtx.resume().then(() => {
+      console.log("AudioContext resumed and sink set");
+    }).catch(err => {
+      console.error("AudioContext resume failed", err);
+    });
   </script>
 </body>
 </html>
