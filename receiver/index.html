@@ -1,27 +1,44 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mic Receiver</title>
+  <title>Mic Receiver (via <audio>)</title>
 </head>
 <body>
   <h1>Mic Receiver</h1>
+  <audio id="player" autoplay controls></audio>
+
   <script>
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
+    const audio = document.getElementById('player');
+    const mime = 'audio/wav; codecs=1'; // PCM
 
-    ws.binaryType = "arraybuffer";
+    if (!MediaSource.isTypeSupported(mime)) {
+      alert('Your browser does not support WAV audio streaming');
+    }
 
-    ws.onmessage = async (event) => {
-      try {
-        const buffer = await audioCtx.decodeAudioData(event.data.slice(0));
-        const source = audioCtx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioCtx.destination);
-        source.start();
-      } catch (err) {
-        console.error("Error decoding audio", err);
+    const mediaSource = new MediaSource();
+    audio.src = URL.createObjectURL(mediaSource);
+
+    mediaSource.addEventListener('sourceopen', () => {
+      const sourceBuffer = mediaSource.addSourceBuffer(mime);
+      const ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
+      ws.binaryType = "arraybuffer";
+
+      const queue = [];
+
+      ws.onmessage = (event) => {
+        queue.push(event.data);
+        push();
+      };
+
+      function push() {
+        if (queue.length > 0 && !sourceBuffer.updating) {
+          const chunk = queue.shift();
+          sourceBuffer.appendBuffer(chunk);
+        }
       }
-    };
+
+      sourceBuffer.addEventListener('updateend', push);
+    });
   </script>
 </body>
 </html>
