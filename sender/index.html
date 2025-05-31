@@ -9,32 +9,29 @@
 </head>
 <body>
   <h1>Mic Sender</h1>
-  <button id="startBtn">Start Streaming</button>
-  <button onclick="resumeAudio()">Resume AudioContext (if needed)</button>
+
+  <button id="enableAudioBtn">Enable Audio</button>
+  <button id="startStreamingBtn" disabled>Start Streaming</button>
 
   <script>
     let ws;
     let audioCtx;
 
-    // Ensure AudioContext is resumed only after real user gesture
-    document.getElementById("startBtn").addEventListener("pointerdown", () => {
+    document.getElementById("enableAudioBtn").addEventListener("click", () => {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
       audioCtx.resume().then(() => {
-        console.log("AudioContext resumed via gesture");
-        startStreaming();
-      }).catch((err) => {
-        console.error("AudioContext resume failed:", err);
+        console.log("AudioContext resumed");
+        document.getElementById("enableAudioBtn").disabled = true;
+        document.getElementById("startStreamingBtn").disabled = false;
+      }).catch(err => {
+        console.error("AudioContext resume failed", err);
       });
     });
 
-    function resumeAudio() {
-      if (audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume().then(() => {
-          console.log("AudioContext resumed manually");
-        });
-      }
-    }
+    document.getElementById("startStreamingBtn").addEventListener("click", () => {
+      startStreaming();
+    });
 
     function startStreaming() {
       ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
