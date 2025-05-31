@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
-<head><title>Mic Sender</title></head>
+<head>
+  <title>Mic Sender</title>
+</head>
 <body>
   <h1>Mic Sender</h1>
   <button onclick="start()">Start Streaming</button>
@@ -16,7 +18,7 @@
       source.connect(processor);
       processor.connect(audioCtx.destination);
 
-      processor.onaudioprocess = e => {
+      processor.onaudioprocess = (e) => {
         const input = e.inputBuffer.getChannelData(0);
         const int16 = new Int16Array(input.length);
         for (let i = 0; i < input.length; i++) {
