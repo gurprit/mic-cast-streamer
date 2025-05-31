@@ -5,7 +5,7 @@
   <h1>Mic Sender</h1>
   <button onclick="start()">Start Streaming</button>
   <script>
-    let ws = new WebSocket("wss://<YOUR_RENDER_DOMAIN>");
+    let ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
 
     async function start() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
