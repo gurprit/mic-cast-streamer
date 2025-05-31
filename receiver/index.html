@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head><title>Mic Receiver</title></head>
+<body>
+  <h1>Mic Receiver</h1>
+  <script>
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ws = new WebSocket("wss://<YOUR_RENDER_DOMAIN>");
+    ws.binaryType = "arraybuffer";
+
+    ws.onmessage = async (event) => {
+      try {
+        const buffer = await audioCtx.decodeAudioData(event.data.slice(0));
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+        source.start();
+      } catch (e) {
+        console.error(\"Error decoding audio\", e);
+      }
+    };
+  </script>
+</body>
+</html>
