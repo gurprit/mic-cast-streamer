@@ -4,37 +4,28 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Cache-Control" content="no-store">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Mic Sender</title>
 </head>
 <body>
   <h1>Mic Sender</h1>
+  <button id="startBtn">Start Streaming</button>
 
-  <button id="enableAudioBtn">Enable Audio</button>
-  <button id="startStreamingBtn" disabled>Start Streaming</button>
   <script>
-
-  if (!sessionStorage.getItem("audioUnlocked")) {
-    window.location.href = "unlock.html";
-  }
-
     let ws;
     let audioCtx;
 
-    document.getElementById("enableAudioBtn").addEventListener("click", () => {
+    document.getElementById("startBtn").addEventListener("click", () => {
+      // Ensure AudioContext is created and resumed in the user gesture
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
       audioCtx.resume().then(() => {
         console.log("AudioContext resumed");
-        document.getElementById("enableAudioBtn").disabled = true;
-        document.getElementById("startStreamingBtn").disabled = false;
+        startStreaming();
       }).catch(err => {
         console.error("AudioContext resume failed", err);
       });
-    });
-
-    document.getElementById("startStreamingBtn").addEventListener("click", () => {
-      startStreaming();
     });
 
     function startStreaming() {
