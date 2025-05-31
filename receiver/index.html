@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mic Receiver (Debug Mode)</title>
+  <title>Mic Receiver (Working Version)</title>
 </head>
 <body>
   <h1>Mic Receiver</h1>
@@ -40,7 +40,7 @@
         const source = audioCtx.createBufferSource();
         source.buffer = buffer;
 
-        // 🔊 Apply gain boost for better hearing
+        // 🔊 Gain boost to make sure audio is loud enough
         const gain = audioCtx.createGain();
         gain.gain.value = 3;
         source.connect(gain);
