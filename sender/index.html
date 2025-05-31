@@ -1,18 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mic Sender</title>
-  <script type="text/javascript" src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
-  <style>
-    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
-  </style>
 </head>
 <body>
   <h1>Mic Sender</h1>
   <button id="startBtn">Start Streaming</button>
-  <button id="castBtn">Cast to Chromecast</button>
 
   <script>
     let ws;
@@ -31,7 +24,7 @@
       ws.onopen = () => {
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
           const source = audioCtx.createMediaStreamSource(stream);
-          const processor = audioCtx.createScriptProcessor(1024, 1, 1); // smaller buffer = lower latency
+          const processor = audioCtx.createScriptProcessor(2048, 1, 1); // stable buffer size
 
           source.connect(processor);
           processor.connect(audioCtx.destination);
@@ -40,44 +33,44 @@
             if (ws.readyState !== WebSocket.OPEN) return;
 
             const input = e.inputBuffer.getChannelData(0);
-            const int16 = new Int16Array(input.length);
-            for (let i = 0; i < input.length; i++) {
-              int16[i] = input[i] * 0x7FFF;
-            }
-            ws.send(int16.buffer);
+            const wavBuffer = encodeWAV(input, audioCtx.sampleRate);
+            ws.send(wavBuffer);
           };
         });
       };
     }
 
-    // === CAST SETUP ===
-    window.__onGCastApiAvailable = function (isAvailable) {
-      if (isAvailable) {
-        cast.framework.CastContext.getInstance().setOptions({
-          receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
-          autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
-        });
-      }
-    };
+    function encodeWAV(samples, sampleRate) {
+      const buffer = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buffer);
 
-    document.getElementById("castBtn").addEventListener("click", () => {
-      const context = cast.framework.CastContext.getInstance();
-      const session = context.getCurrentSession();
-
-      if (!session) {
-        context.requestSession().then(() => {
-          loadReceiver();
-        });
-      } else {
-        loadReceiver();
+      function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
       }
 
-      function loadReceiver() {
-        const mediaInfo = new chrome.cast.media.MediaInfo("https://mic-cast-receiver.onrender.com", "text/html");
-        const request = new chrome.cast.media.LoadRequest(mediaInfo);
-        context.getCurrentSession().loadMedia(request).catch(err => console.error("Cast load error", err));
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + samples.length * 2, true);
+      writeString(view, 8, 'WAVE');
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); // PCM
+      view.setUint16(22, 1, true); // Mono
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(view, 36, 'data');
+      view.setUint32(40, samples.length * 2, true);
+
+      for (let i = 0; i < samples.length; i++) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(44 + i * 2, s * 0x7FFF, true);
       }
-    });
+
+      return buffer;
+    }
   </script>
 </body>
 </html>
