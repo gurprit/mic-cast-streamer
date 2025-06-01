@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mic Receiver (Working Version)</title>
+  <title>Mic Receiver</title>
 </head>
 <body>
   <h1>Mic Receiver</h1>
@@ -14,12 +14,12 @@
     audioCtx.resume().then(() => {
       console.log("AudioContext resumed");
 
-      // 🔔 Confirm output works with test tone
+      // Optional test tone to confirm output
       const testOsc = audioCtx.createOscillator();
       testOsc.frequency.value = 440;
       testOsc.connect(audioCtx.destination);
       testOsc.start();
-      testOsc.stop(audioCtx.currentTime + 1); // 1-second test tone
+      testOsc.stop(audioCtx.currentTime + 1);
       console.log("Played test tone");
     }).catch(err => {
       console.error("AudioContext resume failed:", err);
@@ -40,7 +40,6 @@
         const source = audioCtx.createBufferSource();
         source.buffer = buffer;
 
-        // 🔊 Gain boost to make sure audio is loud enough
         const gain = audioCtx.createGain();
         gain.gain.value = 3;
         source.connect(gain);
