@@ -1,25 +1,24 @@
-const WebSocket = require('ws');
 const express = require('express');
-const http = require('http');
+const fs = require('fs');
+const { PassThrough } = require('stream');
 
 const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const PORT = process.env.PORT || 8080;
 
-wss.on('connection', function (ws) {
-  console.log('Client connected');
-  ws.on('message', function (data) {
-    wss.clients.forEach(client => {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(data);
-      }
-    });
-  });
+const audioStream = new PassThrough();
+
+app.use(express.static(__dirname));
+
+app.post('/upload', (req, res) => {
+  req.pipe(audioStream, { end: false });
+  res.status(200).end();
 });
 
-app.get('/', (req, res) => res.send('WebSocket Server Running'));
+app.get('/live-audio.webm', (req, res) => {
+  res.setHeader('Content-Type', 'audio/webm');
+  audioStream.pipe(res);
+});
 
-const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });

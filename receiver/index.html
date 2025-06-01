@@ -6,66 +6,24 @@
   <style>
     body {
       font-family: sans-serif;
+      background: #f2f2f2;
       text-align: center;
-      margin-top: 2rem;
-      background: #f8f8f8;
+      margin-top: 50px;
+    }
+    audio {
+      width: 80%;
     }
   </style>
 </head>
 <body>
-  <h2>🎧 Mic Cast Receiver</h2>
-  <p>Waiting for audio stream...</p>
+  <h1>🎙️ Receiving Mic Cast</h1>
+  <audio id="audio" autoplay controls></audio>
   <script>
-    const ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
-
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const sampleRate = 44100;
-    const channelCount = 1;
-
-    ws.binaryType = 'arraybuffer';
-
-    ws.onmessage = async (event) => {
-      const int16Array = new Int16Array(event.data);
-      console.log("Received chunk of size:", int16Array.length);
-
-      // Preview first few samples
-      console.log("First 10 samples: ", int16Array.slice(0, 10));
-
-      const float32Array = new Float32Array(int16Array.length);
-      for (let i = 0; i < int16Array.length; i++) {
-        float32Array[i] = int16Array[i] / 32768;
-      }
-
-      try {
-        // Resume context immediately to avoid gesture requirement on Chromecast
-        await audioCtx.resume();
-
-        const audioBuffer = audioCtx.createBuffer(
-          channelCount,
-          float32Array.length,
-          sampleRate
-        );
-        audioBuffer.getChannelData(0).set(float32Array);
-
-        console.log("Decoded audio buffer duration:", audioBuffer.duration);
-
-        const source = audioCtx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioCtx.destination);
-        source.start();
-        console.log("Playback started");
-      } catch (err) {
-        console.error("Audio playback error:", err);
-      }
-    };
-
-    ws.onopen = () => {
-      console.log("WebSocket connected");
-    };
-
-    ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
-    };
+    const audio = document.getElementById("audio");
+    audio.src = "https://mic-cast-streamer.onrender.com/live-audio.webm";
+    audio.play().catch(err => {
+      console.error("Auto-play failed:", err);
+    });
   </script>
 </body>
 </html>
