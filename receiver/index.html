@@ -14,7 +14,6 @@
     audioCtx.resume().then(() => {
       console.log("AudioContext resumed");
 
-      // Optional test tone to confirm output
       const testOsc = audioCtx.createOscillator();
       testOsc.frequency.value = 440;
       testOsc.connect(audioCtx.destination);

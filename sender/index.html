@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mic Sender (Silent)</title>
+  <title>Mic Sender (Working with Preview)</title>
 </head>
 <body>
   <h1>Mic Sender</h1>
@@ -27,10 +27,17 @@
 
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
           const source = audioCtx.createMediaStreamSource(stream);
-          const processor = audioCtx.createScriptProcessor(1024, 1, 1);
 
+          // 🔊 Live mic monitor (preview)
+          const preview = audioCtx.createGain();
+          preview.gain.value = 1;
+          source.connect(preview);
+          preview.connect(audioCtx.destination);
+          console.log("Live mic preview enabled");
+
+          const processor = audioCtx.createScriptProcessor(1024, 1, 1);
           source.connect(processor);
-          // processor.connect(audioCtx.destination); // ❌ Disable local audio output
+          processor.connect(audioCtx.destination);
 
           processor.onaudioprocess = (e) => {
             if (ws.readyState !== WebSocket.OPEN) return;
