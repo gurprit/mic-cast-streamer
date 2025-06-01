@@ -5,37 +5,50 @@
 </head>
 <body>
   <h1>🎤 Mic Cast Sender</h1>
-  <p>Status: <span id="status">Initializing...</span></p>
+  <p>Status: <span id="status">Waiting to start...</span></p>
   <label for="gainControl">🎛️ Gain: </label>
   <input type="range" id="gainControl" min="0" max="5" step="0.1" value="1">
   <span id="gainValue">1.0</span>x
+  <br><br>
+  <button id="startButton">Start Streaming</button>
 
   <script>
     const statusEl = document.getElementById('status');
     const gainSlider = document.getElementById('gainControl');
     const gainValueEl = document.getElementById('gainValue');
+    const startButton = document.getElementById('startButton');
 
-    let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    let gainNode = audioCtx.createGain();
-    gainNode.gain.value = parseFloat(gainSlider.value);
+    let audioCtx;
+    let gainNode;
 
     gainSlider.oninput = () => {
-      gainNode.gain.value = parseFloat(gainSlider.value);
+      if (gainNode) {
+        gainNode.gain.value = parseFloat(gainSlider.value);
+      }
       gainValueEl.textContent = gainSlider.value;
     };
 
     async function startMic() {
+      startButton.disabled = true;
+      statusEl.textContent = 'Starting mic...';
+
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = parseFloat(gainSlider.value);
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const source = audioCtx.createMediaStreamSource(stream);
-        const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+        const processor = audioCtx.createScriptProcessor(1024, 1, 1);
         const socket = new WebSocket('wss://mic-cast-streamer.onrender.com');
 
-        socket.onopen = () => statusEl.textContent = 'WebSocket connected ✅';
+        socket.onopen = () => {
+          statusEl.textContent = 'WebSocket connected ✅';
+        };
 
         source.connect(gainNode);
         gainNode.connect(processor);
-        processor.connect(audioCtx.destination); // Optional: for local monitoring
+        processor.connect(audioCtx.destination); // Optional: monitor locally
 
         processor.onaudioprocess = e => {
           if (socket.readyState === WebSocket.OPEN) {
@@ -45,23 +58,25 @@
               pcm[i] = Math.max(-1, Math.min(1, input[i])) * 32767;
             }
             socket.send(pcm.buffer);
+            console.log("Mic sample preview:", pcm.slice(0, 10));
+            console.log("Sending chunk of size:", pcm.byteLength);
           }
         };
 
-        statusEl.textContent = 'Mic started 🎙️';
+        statusEl.textContent = 'Streaming 🎙️';
       } catch (err) {
         console.error(err);
         statusEl.textContent = 'Mic error ❌';
+        startButton.disabled = false;
       }
     }
 
-    document.body.addEventListener('click', () => {
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
+    startButton.onclick = () => {
+      if (!audioCtx || audioCtx.state === 'suspended') {
+        audioCtx?.resume();
       }
-    });
-
-    startMic();
+      startMic();
+    };
   </script>
 </body>
 </html>
