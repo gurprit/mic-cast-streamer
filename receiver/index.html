@@ -16,7 +16,8 @@
   <h2>🎧 Mic Cast Receiver</h2>
   <p>Waiting for audio stream...</p>
   <script>
-    const ws = new WebSocket("wss://" + location.hostname + "/stream");
+    const ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
+
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const sampleRate = 44100;
     const channelCount = 1;
