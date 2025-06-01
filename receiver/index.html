@@ -1,48 +1,70 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8" />
   <title>Mic Cast Receiver</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 2rem;
+      background: #f8f8f8;
+    }
+  </style>
 </head>
 <body>
-  <h1>🔊 Mic Cast Receiver</h1>
-  <p>Status: <span id="status">Connecting...</span></p>
+  <h2>🎧 Mic Cast Receiver</h2>
+  <p>Waiting for audio stream...</p>
   <script>
-    const statusEl = document.getElementById('status');
-    const sampleRate = 44100;
-    const socket = new WebSocket('wss://mic-cast-streamer.onrender.com');
-    socket.binaryType = 'arraybuffer';
-
+    const ws = new WebSocket("wss://" + location.hostname + "/stream");
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    socket.onopen = () => statusEl.textContent = 'WebSocket connected ✅';
+    const sampleRate = 44100;
+    const channelCount = 1;
 
-    socket.onmessage = (event) => {
-      const int16Data = new Int16Array(event.data);
-      const float32Data = new Float32Array(int16Data.length);
-      for (let i = 0; i < int16Data.length; i++) {
-        float32Data[i] = int16Data[i] / 32768;
+    ws.binaryType = 'arraybuffer';
+
+    ws.onmessage = async (event) => {
+      const int16Array = new Int16Array(event.data);
+      console.log("Received chunk of size:", int16Array.length);
+
+      // Preview first few samples
+      console.log("First 10 samples: ", int16Array.slice(0, 10));
+
+      const float32Array = new Float32Array(int16Array.length);
+      for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768;
       }
 
-      const buffer = audioCtx.createBuffer(1, float32Data.length, sampleRate);
-      buffer.copyToChannel(float32Data, 0);
+      try {
+        // Resume context immediately to avoid gesture requirement on Chromecast
+        await audioCtx.resume();
 
-      const source = audioCtx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(audioCtx.destination);
-      source.start();
+        const audioBuffer = audioCtx.createBuffer(
+          channelCount,
+          float32Array.length,
+          sampleRate
+        );
+        audioBuffer.getChannelData(0).set(float32Array);
 
-      console.log("Received chunk of size:", event.data.byteLength);
-      console.log("First 10 samples:", float32Data.slice(0, 10));
+        console.log("Decoded audio buffer duration:", audioBuffer.duration);
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioCtx.destination);
+        source.start();
+        console.log("Playback started");
+      } catch (err) {
+        console.error("Audio playback error:", err);
+      }
     };
 
-    document.body.addEventListener('click', () => {
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-        statusEl.textContent = 'AudioContext resumed 🎧';
-      }
-    });
+    ws.onopen = () => {
+      console.log("WebSocket connected");
+    };
 
-    socket.onerror = () => statusEl.textContent = 'WebSocket error ❌';
-    socket.onclose = () => statusEl.textContent = 'WebSocket closed 🔌';
+    ws.onerror = (err) => {
+      console.error("WebSocket error:", err);
+    };
   </script>
 </body>
 </html>
