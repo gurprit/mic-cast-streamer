@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mic Sender (Working with Preview)</title>
+  <title>Mic Sender (Mic Test Enabled)</title>
 </head>
 <body>
   <h1>Mic Sender</h1>
@@ -28,7 +28,7 @@
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
           const source = audioCtx.createMediaStreamSource(stream);
 
-          // 🔊 Live mic monitor (preview)
+          // ✅ Live mic monitor (so you can hear yourself)
           const preview = audioCtx.createGain();
           preview.gain.value = 1;
           source.connect(preview);
@@ -37,12 +37,16 @@
 
           const processor = audioCtx.createScriptProcessor(1024, 1, 1);
           source.connect(processor);
-          processor.connect(audioCtx.destination);
+          processor.connect(audioCtx.destination); // Optional: allows playback of stream
 
           processor.onaudioprocess = (e) => {
             if (ws.readyState !== WebSocket.OPEN) return;
 
             const input = e.inputBuffer.getChannelData(0);
+
+            // ✅ Log first 10 mic samples
+            console.log("Mic sample preview:", input.slice(0, 10));
+
             const wavBuffer = encodeWAV(input, audioCtx.sampleRate);
             ws.send(wavBuffer);
             console.log("Sending chunk of size:", input.length);
