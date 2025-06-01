@@ -8,31 +8,25 @@
   <p>Status: <span id="status">Connecting...</span></p>
   <script>
     const statusEl = document.getElementById('status');
-
-    const sampleRate = 44100; // Match sender's audio context rate
+    const sampleRate = 44100;
     const socket = new WebSocket('wss://mic-cast-streamer.onrender.com');
     socket.binaryType = 'arraybuffer';
 
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    let started = false;
-
-    socket.onopen = () => {
-      statusEl.textContent = 'WebSocket connected ✅';
-    };
+    socket.onopen = () => statusEl.textContent = 'WebSocket connected ✅';
 
     socket.onmessage = (event) => {
       const int16Data = new Int16Array(event.data);
       const float32Data = new Float32Array(int16Data.length);
-
       for (let i = 0; i < int16Data.length; i++) {
         float32Data[i] = int16Data[i] / 32768;
       }
 
-      const audioBuffer = audioCtx.createBuffer(1, float32Data.length, sampleRate);
-      audioBuffer.copyToChannel(float32Data, 0);
+      const buffer = audioCtx.createBuffer(1, float32Data.length, sampleRate);
+      buffer.copyToChannel(float32Data, 0);
 
       const source = audioCtx.createBufferSource();
-      source.buffer = audioBuffer;
+      source.buffer = buffer;
       source.connect(audioCtx.destination);
       source.start();
 
@@ -47,14 +41,8 @@
       }
     });
 
-    socket.onerror = (err) => {
-      console.error("WebSocket error", err);
-      statusEl.textContent = 'WebSocket error ❌';
-    };
-
-    socket.onclose = () => {
-      statusEl.textContent = 'WebSocket closed 🔌';
-    };
+    socket.onerror = () => statusEl.textContent = 'WebSocket error ❌';
+    socket.onclose = () => statusEl.textContent = 'WebSocket closed 🔌';
   </script>
 </body>
 </html>

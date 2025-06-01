@@ -2,80 +2,86 @@
 <html>
 <head>
   <title>Mic Cast Sender</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 1rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+    }
+    #startBtn {
+      font-size: 1.2rem;
+      padding: 0.75rem 1.5rem;
+      margin: 1rem 0;
+    }
+    #status {
+      margin-top: 0.5rem;
+      font-weight: bold;
+    }
+    .cast-btn {
+      margin: 1rem;
+    }
+  </style>
 </head>
 <body>
   <h1>🎤 Mic Cast Sender</h1>
-  <p>Status: <span id="status">Waiting to start...</span></p>
-  <label for="gainControl">🎛️ Gain: </label>
-  <input type="range" id="gainControl" min="0" max="5" step="0.1" value="1">
-  <span id="gainValue">1.0</span>x
-  <br><br>
-  <button id="startButton">Start Streaming</button>
+  <button id="startBtn">Start Streaming</button>
+  <p id="status">Not started</p>
+
+  <div class="cast-btn">
+    <google-cast-launcher></google-cast-launcher>
+  </div>
 
   <script>
-    const statusEl = document.getElementById('status');
-    const gainSlider = document.getElementById('gainControl');
-    const gainValueEl = document.getElementById('gainValue');
-    const startButton = document.getElementById('startButton');
+    const startBtn = document.getElementById("startBtn");
+    const statusEl = document.getElementById("status");
 
-    let audioCtx;
-    let gainNode;
+    let audioCtx, processor, input, socket;
 
-    gainSlider.oninput = () => {
-      if (gainNode) {
-        gainNode.gain.value = parseFloat(gainSlider.value);
-      }
-      gainValueEl.textContent = gainSlider.value;
+    startBtn.onclick = async () => {
+      if (socket && socket.readyState === WebSocket.OPEN) return;
+
+      socket = new WebSocket("wss://mic-cast-streamer.onrender.com");
+      socket.binaryType = "arraybuffer";
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = 1.5; // Boost mic volume
+
+      processor = audioCtx.createScriptProcessor(2048, 1, 1);
+      source.connect(gainNode).connect(processor).connect(audioCtx.destination);
+
+      processor.onaudioprocess = e => {
+        const input = e.inputBuffer.getChannelData(0);
+        const int16 = new Int16Array(input.length);
+        for (let i = 0; i < input.length; i++) {
+          int16[i] = input[i] * 32767;
+        }
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(int16.buffer);
+        }
+        console.log("Mic sample preview:", int16.slice(0, 10));
+      };
+
+      statusEl.textContent = "Streaming 🎙️";
     };
 
-    async function startMic() {
-      startButton.disabled = true;
-      statusEl.textContent = 'Starting mic...';
-
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      gainNode = audioCtx.createGain();
-      gainNode.gain.value = parseFloat(gainSlider.value);
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const source = audioCtx.createMediaStreamSource(stream);
-        const processor = audioCtx.createScriptProcessor(1024, 1, 1);
-        const socket = new WebSocket('wss://mic-cast-streamer.onrender.com');
-
-        socket.onopen = () => {
-          statusEl.textContent = 'WebSocket connected ✅';
-        };
-
-        source.connect(gainNode);
-        gainNode.connect(processor);
-        processor.connect(audioCtx.destination); // Optional: monitor locally
-
-        processor.onaudioprocess = e => {
-          if (socket.readyState === WebSocket.OPEN) {
-            const input = e.inputBuffer.getChannelData(0);
-            const pcm = new Int16Array(input.length);
-            for (let i = 0; i < input.length; i++) {
-              pcm[i] = Math.max(-1, Math.min(1, input[i])) * 32767;
-            }
-            socket.send(pcm.buffer);
-            console.log("Mic sample preview:", pcm.slice(0, 10));
-            console.log("Sending chunk of size:", pcm.byteLength);
-          }
-        };
-
-        statusEl.textContent = 'Streaming 🎙️';
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = 'Mic error ❌';
-        startButton.disabled = false;
+    // Chromecast receiver link
+    window['__onGCastApiAvailable'] = function(isAvailable) {
+      if (isAvailable) {
+        cast.framework.CastContext.getInstance().setOptions({
+          receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+          autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+        });
       }
-    }
-
-    startButton.onclick = () => {
-      if (!audioCtx || audioCtx.state === 'suspended') {
-        audioCtx?.resume();
-      }
-      startMic();
     };
   </script>
 </body>
