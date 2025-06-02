@@ -10,38 +10,64 @@
       margin-top: 2rem;
       background: #f8f8f8;
     }
-    #qr-container {
-      margin-top: 2rem;
-    }
     #qrcode {
-      display: inline-block;
       margin-top: 1rem;
+    }
+    canvas {
+      margin-top: 1rem;
+    }
+    button {
+      font-size: 1rem;
+      padding: 0.5rem 1rem;
     }
   </style>
 </head>
 <body>
   <h2>🎧 Mic Cast Receiver</h2>
-  <p>Waiting for audio stream...</p>
+  <p>Scan the QR code below to join as a microphone:</p>
+  <div id="qrcode"></div>
+  <p><button id="startButton">🎶 Start Listening</button></p>
 
-  <div id="qr-container">
-    <p>📱 Scan to join as a mic</p>
-    <div id="qrcode"></div>
-  </div>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <script>
+    const senderUrl = 'https://mic-cast-sender.onrender.com';
     const ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
-
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const sampleRate = 44100;
     const channelCount = 1;
+    let listening = false;
+
+    // Generate QR code
+    QRCode.toCanvas(document.getElementById("qrcode"), senderUrl, function (error) {
+      if (error) console.error(error);
+      console.log('QR code generated!');
+    });
+
+    // Require gesture to start audio
+    document.getElementById("startButton").addEventListener("click", () => {
+      audioCtx.resume().then(() => {
+        console.log("AudioContext resumed");
+        listening = true;
+        document.getElementById("startButton").disabled = true;
+      });
+    });
 
     ws.binaryType = 'arraybuffer';
 
+    ws.onopen = () => {
+      console.log("WebSocket connected");
+    };
+
+    ws.onerror = (err) => {
+      console.error("WebSocket error:", err);
+    };
+
     ws.onmessage = async (event) => {
+      if (!listening) return;
+
       const int16Array = new Int16Array(event.data);
       console.log("Received chunk of size:", int16Array.length);
+      console.log("First 10 samples: ", int16Array.slice(0, 10));
 
       const float32Array = new Float32Array(int16Array.length);
       for (let i = 0; i < int16Array.length; i++) {
@@ -49,13 +75,7 @@
       }
 
       try {
-        await audioCtx.resume();
-
-        const audioBuffer = audioCtx.createBuffer(
-          channelCount,
-          float32Array.length,
-          sampleRate
-        );
+        const audioBuffer = audioCtx.createBuffer(channelCount, float32Array.length, sampleRate);
         audioBuffer.getChannelData(0).set(float32Array);
 
         const source = audioCtx.createBufferSource();
@@ -67,25 +87,6 @@
         console.error("Audio playback error:", err);
       }
     };
-
-    ws.onopen = () => {
-      console.log("WebSocket connected");
-    };
-
-    ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
-    };
-
-    // ✅ Generate QR Code
-    const senderURL = "https://mic-cast-sender.onrender.com/";
-    new QRCode(document.getElementById("qrcode"), {
-      text: senderURL,
-      width: 128,
-      height: 128,
-      colorDark: "#000000",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.H
-    });
   </script>
 </body>
 </html>
