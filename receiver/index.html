@@ -10,111 +10,70 @@
       margin-top: 2rem;
       background: #f8f8f8;
     }
-    #status {
-      margin: 1rem;
-      color: green;
-    }
-    #activity {
-      margin-top: 2rem;
-    }
-    .speaker {
-      padding: 0.5rem;
-      margin: 0.5rem;
-      background: #ddd;
-      border-radius: 5px;
-      display: inline-block;
-      min-width: 100px;
-    }
-    .active {
-      background: #4caf50;
-      color: white;
-      font-weight: bold;
+    canvas {
+      margin-top: 1rem;
     }
   </style>
 </head>
 <body>
   <h2>🎧 Mic Cast Receiver</h2>
-  <p id="status">Connecting...</p>
-  <div id="activity"></div>
+  <p id="status">Waiting for audio stream...</p>
+  <p>Scan to join:</p>
+  <canvas id="qr"></canvas>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
   <script>
-    const sessionId = location.pathname.split("/").pop();
+    // Generate or extract session ID
+    let sessionId = new URLSearchParams(window.location.search).get("session");
     if (!sessionId) {
-      document.getElementById("status").textContent = "❌ Session ID missing from URL";
-      throw new Error("Session ID is missing.");
+      sessionId = crypto.randomUUID();
+      window.location.search = "?session=" + sessionId;
     }
 
-    const ws = new WebSocket(`wss://mic-cast-streamer.onrender.com/ws/${sessionId}`);
+    // Create QR code for senders
+    const senderUrl = `${window.location.origin.replace("receiver", "sender")}/?session=${sessionId}`;
+    try {
+      const qr = qrcode(0, 'L');
+      qr.addData(senderUrl);
+      qr.make();
+      document.getElementById('qr').outerHTML = qr.createImgTag(6);
+      console.log("QR code generated for:", senderUrl);
+    } catch (err) {
+      console.error("QR Code generation error:", err);
+    }
+
+    const ws = new WebSocket(`wss://mic-cast-streamer.onrender.com/?session=${sessionId}`);
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const sampleRate = 44100;
     const channelCount = 1;
-    const speakerActivity = new Map();
 
     ws.binaryType = 'arraybuffer';
 
-    ws.onopen = () => {
-      document.getElementById("status").textContent = "✅ Connected to session: " + sessionId;
-      console.log("WebSocket connected");
-    };
-
-    ws.onerror = (err) => {
-      document.getElementById("status").textContent = "❌ WebSocket error";
-      console.error("WebSocket error:", err);
-    };
-
     ws.onmessage = async (event) => {
+      const int16Array = new Int16Array(event.data);
+      console.log("Received chunk of size:", int16Array.length);
+
+      const float32Array = new Float32Array(int16Array.length);
+      for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768;
+      }
+
       try {
-        const parsed = JSON.parse(event.data);
-        if (parsed.type === 'audio') {
-          const { audio, name } = parsed;
-          const int16Array = new Int16Array(new Uint8Array(audio).buffer);
-          const float32Array = new Float32Array(int16Array.length);
-          for (let i = 0; i < int16Array.length; i++) {
-            float32Array[i] = int16Array[i] / 32768;
-          }
-
-          await audioCtx.resume();
-          const buffer = audioCtx.createBuffer(channelCount, float32Array.length, sampleRate);
-          buffer.getChannelData(0).set(float32Array);
-
-          const source = audioCtx.createBufferSource();
-          source.buffer = buffer;
-          source.connect(audioCtx.destination);
-          source.start();
-
-          updateSpeaker(name);
-        }
-      } catch (e) {
-        console.warn("Non-audio or malformed message", e);
+        await audioCtx.resume();
+        const audioBuffer = audioCtx.createBuffer(channelCount, float32Array.length, sampleRate);
+        audioBuffer.getChannelData(0).set(float32Array);
+        const source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioCtx.destination);
+        source.start();
+        document.getElementById("status").textContent = "🔊 Receiving audio...";
+      } catch (err) {
+        console.error("Audio playback error:", err);
       }
     };
 
-    function updateSpeaker(name) {
-      if (!name) return;
-      speakerActivity.set(name, Date.now());
-
-      const container = document.getElementById("activity");
-      container.innerHTML = "";
-
-      const now = Date.now();
-      for (const [speaker, lastTime] of speakerActivity.entries()) {
-        const div = document.createElement("div");
-        div.className = "speaker";
-        if (now - lastTime < 1000) div.classList.add("active");
-        div.textContent = speaker;
-        container.appendChild(div);
-      }
-    }
-
-    // Optionally prune old speakers
-    setInterval(() => {
-      const now = Date.now();
-      for (const [name, last] of speakerActivity.entries()) {
-        if (now - last > 3000) {
-          speakerActivity.delete(name);
-        }
-      }
-    }, 2000);
+    ws.onopen = () => console.log("WebSocket connected");
+    ws.onerror = (err) => console.error("WebSocket error:", err);
   </script>
 </body>
 </html>
