@@ -2,57 +2,50 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Mic Cast Sender</title>
+  <title>Mic Sender</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: sans-serif; text-align: center; margin-top: 2rem; background: #f0f0f0; }
-    button { font-size: 1.2rem; padding: 1rem; background-color: #007BFF; color: white; border: none; border-radius: 8px; cursor: pointer; }
-    button:hover { background-color: #0056b3; }
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 2rem;
+      background: #f0f0f0;
+    }
+    button {
+      font-size: 1.2rem;
+      padding: 0.6rem 1.2rem;
+    }
   </style>
 </head>
 <body>
-  <h2>🎤 Mic Cast Sender</h2>
-  <button id="startBtn">Start Streaming</button>
+  <h2>🎙️ Mic Sender</h2>
+  <button id="start">Start Streaming</button>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session');
-    if (!sessionId) {
-      alert("Session ID is missing in the URL.");
-      throw new Error("Session ID is missing.");
-    }
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session");
+    if (!sessionId) throw new Error("Session ID is missing.");
 
-    const startBtn = document.getElementById('startBtn');
+    const ws = new WebSocket(`wss://mic-cast-streamer.onrender.com/${sessionId}`);
 
-    startBtn.onclick = async () => {
-      startBtn.disabled = true;
-      startBtn.innerText = "Streaming...";
+    document.getElementById("start").onclick = async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const processor = audioCtx.createScriptProcessor(2048, 1, 1);
 
-      const ws = new WebSocket("ws://localhost:8080");
-      ws.binaryType = "arraybuffer";
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
 
-      ws.onopen = async () => {
-        ws.send(JSON.stringify({ type: 'join', sessionId }));
-
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioCtx.createMediaStreamSource(stream);
-
-        const processor = audioCtx.createScriptProcessor(2048, 1, 1);
-        const gainNode = audioCtx.createGain();
-        gainNode.gain.value = 2.0;
-
-        source.connect(gainNode).connect(processor).connect(audioCtx.destination);
-
-        processor.onaudioprocess = (e) => {
-          const input = e.inputBuffer.getChannelData(0);
-          const int16Buffer = new Int16Array(input.length);
-          for (let i = 0; i < input.length; i++) {
-            int16Buffer[i] = input[i] * 32767;
-          }
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(int16Buffer.buffer);
-          }
-        };
+      processor.onaudioprocess = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        const int16 = new Int16Array(input.length);
+        for (let i = 0; i < input.length; i++) {
+          int16[i] = Math.max(-32768, Math.min(32767, input[i] * 32768));
+        }
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(int16.buffer);
+        }
       };
     };
   </script>

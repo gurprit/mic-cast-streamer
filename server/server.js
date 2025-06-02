@@ -1,44 +1,42 @@
-const WebSocket = require('ws');
-const { v4: uuidv4 } = require('uuid');
+const express = require("express");
+const http = require("http");
+const { WebSocketServer } = require("ws");
+const { v4: uuidv4 } = require("uuid");
+const path = require("path");
 
-const wss = new WebSocket.Server({ port: 8080 });
-const sessions = {}; // { sessionId: Set of WebSocket clients }
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocketServer({ noServer: true });
+const sessions = new Map();
 
-wss.on('connection', (ws) => {
-  let sessionId = null;
+server.on("upgrade", (req, socket, head) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const sessionId = url.pathname.slice(1);
 
-  ws.on('message', (message) => {
-    if (typeof message === 'string') {
-      // Expecting a JSON string with session info
-      try {
-        const data = JSON.parse(message);
-        if (data.type === 'join' && data.sessionId) {
-          sessionId = data.sessionId;
-          if (!sessions[sessionId]) {
-            sessions[sessionId] = new Set();
-          }
-          sessions[sessionId].add(ws);
-          console.log(`Client joined session: ${sessionId}`);
+  if (!sessions.has(sessionId)) {
+    sessions.set(sessionId, new Set());
+  }
+
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    ws.sessionId = sessionId;
+    sessions.get(sessionId).add(ws);
+    ws.on("message", (msg) => {
+      for (const client of sessions.get(sessionId)) {
+        if (client !== ws && client.readyState === client.OPEN) {
+          client.send(msg);
         }
-      } catch (e) {
-        console.error('Invalid JSON:', e);
       }
-    } else if (sessionId && sessions[sessionId]) {
-      // Broadcast binary data to all clients in the same session
-      sessions[sessionId].forEach((client) => {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-          client.send(message);
-        }
-      });
-    }
-  });
-
-  ws.on('close', () => {
-    if (sessionId && sessions[sessionId]) {
-      sessions[sessionId].delete(ws);
-      if (sessions[sessionId].size === 0) {
-        delete sessions[sessionId];
-      }
-    }
+    });
+    ws.on("close", () => {
+      sessions.get(sessionId).delete(ws);
+    });
   });
 });
+
+app.use("/sender", express.static(path.join(__dirname, "../sender")));
+app.use("/receiver", express.static(path.join(__dirname, "../receiver")));
+
+app.get("/", (req, res) => res.redirect("/receiver"));
+
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => console.log(`Server running on ${PORT}`));

@@ -1,17 +1,14 @@
 {
   "name": "mic-cast-server",
   "version": "1.0.0",
-  "description": "HTTP server for Mic Cast audio streaming",
-  "main": "server.js",
+  "description": "Virtual karaoke booth server",
+  "main": "server/server.js",
   "scripts": {
-    "start": "node server/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server/server.js"
   },
   "dependencies": {
-    "cors": "^2.8.5",
     "express": "^4.18.2",
-    "uuid": "^11.1.0"
-  },
-  "author": "",
-  "license": "ISC"
+    "uuid": "^9.0.0",
+    "ws": "^8.13.0"
+  }
 }
