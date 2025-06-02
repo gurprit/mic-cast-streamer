@@ -1,159 +1,86 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
   <title>Mic Cast Sender</title>
-  <script src="//www.gstatic.com/cast/sdk/libs/sender/v3/cast_sender.js?loadCastFramework=1"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
   <style>
-    body { font-family: sans-serif; padding: 2em; text-align: center; }
-    button { font-size: 1.5em; padding: 1em; margin: 0.5em; }
-    google-cast-button { font-size: 1.5em; padding: 1em; margin: 0.5em; width: 40px; height: 40px; display: inline-block; vertical-align: middle; }
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 1rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+    }
+    #startBtn {
+      font-size: 1.2rem;
+      padding: 0.75rem 1.5rem;
+      margin: 1rem 0;
+    }
+    #status {
+      margin-top: 0.5rem;
+      font-weight: bold;
+    }
+    .cast-btn {
+      margin: 1rem;
+    }
   </style>
 </head>
 <body>
-  <h1>Mic Cast Sender 🎙️<google-cast-button></google-cast-button></h1>
-  <button id="startRecording">🎤 Start Recording</button>
-  <button id="stopRecording" disabled>⏹️ Stop Recording</button>
-  <p id="status"></p>
+  <h1>🎤 Mic Cast Sender</h1>
+  <button id="startBtn">Start Streaming</button>
+  <p id="status">Not started</p>
+
+  <div class="cast-btn">
+    <google-cast-launcher></google-cast-launcher>
+  </div>
+
   <script>
-    const startButton = document.getElementById('startRecording');
-    const stopButton = document.getElementById('stopRecording');
-    const statusElement = document.getElementById('status');
+    const startBtn = document.getElementById("startBtn");
+    const statusEl = document.getElementById("status");
 
-    const APPLICATION_ID = '251BB467'; // Provided Application ID
-    const serverBaseUrl = "https://mic-cast-streamer.onrender.com"; // Server URL
-    const streamPath = "/stream";
-    const serverStreamUrl = serverBaseUrl + streamPath; // Full URL for POSTing and for Cast MediaInfo
+    let audioCtx, processor, input, socket;
 
-    let mediaRecorder;
-    let recordedChunks = [];
+    startBtn.onclick = async () => {
+      if (socket && socket.readyState === WebSocket.OPEN) return;
 
-    // Initialize CastContext
+      socket = new WebSocket("wss://mic-cast-streamer.onrender.com");
+      socket.binaryType = "arraybuffer";
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = 1.5; // Boost mic volume
+
+      processor = audioCtx.createScriptProcessor(2048, 1, 1);
+      source.connect(gainNode).connect(processor).connect(audioCtx.destination);
+
+      processor.onaudioprocess = e => {
+        const input = e.inputBuffer.getChannelData(0);
+        const int16 = new Int16Array(input.length);
+        for (let i = 0; i < input.length; i++) {
+          int16[i] = input[i] * 32767;
+        }
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(int16.buffer);
+        }
+        console.log("Mic sample preview:", int16.slice(0, 10));
+      };
+
+      statusEl.textContent = "Streaming 🎙️";
+    };
+
+    // Chromecast receiver link
     window['__onGCastApiAvailable'] = function(isAvailable) {
       if (isAvailable) {
-        initializeCastApi();
-      }
-    };
-
-    function initializeCastApi() {
-      cast.framework.CastContext.getInstance().setOptions({
-        receiverApplicationId: APPLICATION_ID,
-        autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
-      });
-      statusElement.textContent = 'Chromecast initialized. Ready to cast.';
-      console.log('Chromecast initialized.');
-    }
-
-    function loadMedia(audioUrl) {
-      const castSession = cast.framework.CastContext.getInstance().getCurrentSession();
-      if (castSession) {
-        statusElement.textContent = `Loading media on Cast device: ${audioUrl}`;
-        console.log(`Attempting to load media: ${audioUrl}`);
-
-        const mediaInfo = new chrome.cast.media.MediaInfo(audioUrl, 'audio/webm');
-        mediaInfo.streamType = chrome.cast.media.StreamType.BUFFERED; // Or .LIVE if server supports true live
-        mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
-        mediaInfo.metadata.metadataType = chrome.cast.media.MetadataType.GENERIC;
-        mediaInfo.metadata.title = 'Mic Cast Stream';
-        mediaInfo.metadata.artist = 'Live Recording';
-        // mediaInfo.metadata.images = [{'url': 'YOUR_IMAGE_URL_HERE'}]; // Optional album art
-
-        const loadRequest = new chrome.cast.media.LoadRequest(mediaInfo);
-
-        castSession.loadMedia(loadRequest).then(() => {
-          statusElement.textContent = 'Playback started on Cast device.';
-          console.log('Media loaded successfully on Cast device.');
-        }).catch(errorCode => {
-          statusElement.textContent = `Error loading media on Cast device: ${errorCode}`;
-          console.error('Error loading media:', errorCode);
+        cast.framework.CastContext.getInstance().setOptions({
+          receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+          autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
         });
-      } else {
-        statusElement.textContent = 'No Cast session available. Click the Cast button.';
-        console.log('No Cast session found.');
-      }
-    }
-
-    startButton.onclick = async () => {
-      statusElement.textContent = 'Initializing microphone...';
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream, {
-          mimeType: "audio/webm;codecs=opus"
-        });
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data && event.data.size > 0) {
-            recordedChunks.push(event.data);
-          }
-        };
-
-        mediaRecorder.onstart = () => {
-          startButton.disabled = true;
-          stopButton.disabled = false;
-          statusElement.textContent = 'Recording...';
-          console.log('Recording started.');
-        };
-
-        mediaRecorder.onstop = async () => {
-          startButton.disabled = false;
-          stopButton.disabled = true;
-          statusElement.textContent = 'Stopping recording...';
-          console.log('Recording stopped.');
-
-          if (recordedChunks.length === 0) {
-            console.log('No audio data recorded.');
-            statusElement.textContent = 'No audio data recorded. Click Start to try again.';
-            return;
-          }
-
-          const audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
-          recordedChunks = [];
-
-          statusElement.textContent = `Sending audio (${audioBlob.size} bytes) to server...`;
-          console.log(`Sending audio Blob of size: ${audioBlob.size} bytes to ${serverStreamUrl}`);
-
-          try {
-            const response = await fetch(serverStreamUrl, { // Use full server URL
-              method: 'POST',
-              body: audioBlob,
-              headers: {
-                'Content-Type': 'audio/webm'
-              }
-            });
-
-            if (response.ok) {
-              statusElement.textContent = 'Audio sent to server! Now attempting to cast.';
-              console.log('Audio sent successfully to server.');
-              // Now try to load this onto the Chromecast device
-              loadMedia(serverStreamUrl);
-            } else {
-              console.error('Failed to send audio to server:', response.status, response.statusText);
-              statusElement.textContent = `Error sending audio to server: ${response.status} ${response.statusText}`;
-            }
-          } catch (error) {
-            console.error('Error sending audio to server:', error);
-            statusElement.textContent = `Error sending audio to server: ${error.message}`;
-          }
-        };
-
-        mediaRecorder.onerror = (event) => {
-          console.error('MediaRecorder error:', event.error);
-          statusElement.textContent = `Recording error: ${event.error.name}`;
-          startButton.disabled = false;
-          stopButton.disabled = true;
-        };
-
-        mediaRecorder.start();
-      } catch (error) {
-        console.error('Error getting user media:', error);
-        statusElement.textContent = `Error accessing microphone: ${error.message}.`;
-        startButton.disabled = false;
-      }
-    };
-
-    stopButton.onclick = () => {
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
       }
     };
   </script>

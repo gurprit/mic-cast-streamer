@@ -5,124 +5,69 @@
   <title>Mic Cast Receiver</title>
   <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 2em; text-align: center; background-color: #222; color: #fff;}
-    cast-media-player {
-      --theme-hue: 210; /* Default Cast blue */
-      width: 80%;
-      height: 450px; /* Standard 16:9 aspect ratio for video, good default for audio too */
-      margin: auto;
-      display: block;
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 2rem;
+      background: #f8f8f8;
     }
     #status { margin-top: 20px; font-size: 1.2em; }
   </style>
 </head>
 <body>
-  <h1>Mic Cast Receiver  Chromecast</h1>
-  <cast-media-player></cast-media-player>
-  <div id="status">Initializing Receiver...</div>
-
+  <h2>🎧 Mic Cast Receiver</h2>
+  <p>Waiting for audio stream...</p>
   <script>
-    const context = cast.framework.CastReceiverContext.getInstance();
-    const playerManager = context.getPlayerManager();
-    const statusElement = document.getElementById('status');
+    const ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
 
-    // Utility to update status on screen
-    function updateStatus(message) {
-      console.log('Status: ' + message);
-      statusElement.textContent = message;
-    }
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const sampleRate = 44100;
+    const channelCount = 1;
 
-    updateStatus('Cast Receiver SDK Loaded.');
+    ws.binaryType = 'arraybuffer';
 
-    // Intercept LOAD requests
-    playerManager.setMessageInterceptor(
-      cast.framework.messages.MessageType.LOAD,
-      loadRequest => {
-        updateStatus('LOAD request received.');
-        console.log('Original LOAD request:', JSON.stringify(loadRequest, null, 2));
+    ws.onmessage = async (event) => {
+      const int16Array = new Int16Array(event.data);
+      console.log("Received chunk of size:", int16Array.length);
 
-        // IMPORTANT: The sender app (e.g., sender/index.html or a mobile app)
-        // should send the correct contentId (URL to the stream).
-        // If loadRequest.media.contentId is already the full URL, no change needed.
-        // If it's a relative path (like '/stream') it will be resolved by CAF
-        // relative to the receiver's origin.
+      // Preview first few samples
+      console.log("First 10 samples: ", int16Array.slice(0, 10));
 
-        if (!loadRequest.media || !loadRequest.media.contentId) {
-          updateStatus('Error: LOAD request missing media or contentId.');
-          console.error('LOAD request is missing media information or contentId.');
-          // Optionally, reject the load request
-          // return new cast.framework.messages.ErrorData(cast.framework.messages.ErrorType.LOAD_FAILED);
-          // For now, we'll let it proceed and likely fail, for debugging.
-        } else {
-          updateStatus(`Loading content from: ${loadRequest.media.contentId}`);
-        }
-
-        // Ensure correct media type and stream type
-        loadRequest.media.contentType = 'audio/webm'; // Must match what the server provides
-        loadRequest.media.streamType = cast.framework.messages.StreamType.BUFFERED; // Or LIVE if server supports true live streaming
-
-        // Optional: Set media metadata for display on the player UI
-        if (!loadRequest.media.metadata) {
-            loadRequest.media.metadata = new cast.framework.messages.MusicTrackMediaMetadata();
-            loadRequest.media.metadata.title = "Mic Cast Stream";
-            loadRequest.media.metadata.artist = "Live Audio";
-        }
-
-        console.log('Modified LOAD request:', JSON.stringify(loadRequest, null, 2));
-        updateStatus('Processing modified LOAD request...');
-        return loadRequest;
+      const float32Array = new Float32Array(int16Array.length);
+      for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768;
       }
-    );
 
-    // Event listener for when the Cast Receiver SDK is ready
-    context.addEventListener(cast.framework.system.EventType.READY, () => {
-      updateStatus(`Receiver Ready. Application ID: ${context.getApplicationData().applicationId}`);
-      console.log('Cast Receiver SDK Ready.');
-    });
+      try {
+        // Resume context immediately to avoid gesture requirement on Chromecast
+        await audioCtx.resume();
 
-    // Event listener for errors
-    playerManager.addEventListener(cast.framework.events.EventType.ERROR, error => {
-      updateStatus(`Player Error: ${error.detailedErrorCode} - ${error.reason}`);
-      console.error('Player Error:', error);
-    });
+        const audioBuffer = audioCtx.createBuffer(
+          channelCount,
+          float32Array.length,
+          sampleRate
+        );
+        audioBuffer.getChannelData(0).set(float32Array);
 
-    // Event listener for when playback starts
-    playerManager.addEventListener(cast.framework.events.EventType.PLAYING, () => {
-      updateStatus('Playback Started.');
-      console.log('Playback has started.');
-    });
+        console.log("Decoded audio buffer duration:", audioBuffer.duration);
 
-    // Event listener for when playback is paused
-    playerManager.addEventListener(cast.framework.events.EventType.PAUSE, () => {
-      updateStatus('Playback Paused.');
-      console.log('Playback paused.');
-    });
+        const source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioCtx.destination);
+        source.start();
+        console.log("Playback started");
+      } catch (err) {
+        console.error("Audio playback error:", err);
+      }
+    };
 
-    // Event listener for when sender disconnects
-    context.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED, event => {
-        updateStatus('Sender disconnected. Closing application if no active senders.');
-        console.log('Sender disconnected event:', event);
-        // Optionally, close the application if there are no more senders
-        if (context.getSenders().length === 0 &&
-            (event.reason === cast.framework.system.DisconnectReason.REQUESTED_BY_SENDER ||
-             event.reason === cast.framework.system.DisconnectReason.UNKNOWN)) {
-            window.close();
-        }
-    });
+    ws.onopen = () => {
+      console.log("WebSocket connected");
+    };
 
-    // Start the Cast Receiver Context
-    try {
-      context.start({
-        // Optional: specify queue behavior, maxInactivity, etc.
-        // maxInactivity: 60 // Close app after 60s of inactivity
-      });
-      updateStatus('Cast Receiver Context started.');
-      console.log('Cast Receiver Context started.');
-    } catch (e) {
-      updateStatus(`Error starting Cast Receiver Context: ${e}`);
-      console.error('Error starting Cast Receiver Context:', e);
-    }
-
+    ws.onerror = (err) => {
+      console.error("WebSocket error:", err);
+    };
   </script>
 </body>
 </html>
