@@ -35,7 +35,7 @@
 
     document.getElementById("startBtn").onclick = async () => {
       const name = document.getElementById("nameInput").value || "Anonymous";
-      ws = new WebSocket(`wss://mic-cast-streamer.onrender.com/${sessionId}`);
+      const ws = new WebSocket(`wss://mic-cast-streamer.onrender.com/?session=${sessionId}`);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const ctx = new AudioContext();
       const src = ctx.createMediaStreamSource(stream);
