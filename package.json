@@ -1,12 +1,13 @@
 {
   "name": "mic-cast-server",
   "version": "1.0.0",
-  "description": "Virtual karaoke booth server",
+  "description": "Session-based WebSocket server for mic-cast",
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js"
   },
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^4.18.2",
     "uuid": "^9.0.0",
     "ws": "^8.13.0"
