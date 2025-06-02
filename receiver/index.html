@@ -2,67 +2,68 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Karaoke Receiver</title>
+  <title>Mic Receiver</title>
   <style>
     body {
       font-family: sans-serif;
       text-align: center;
-      background: #f0f0f0;
-      margin-top: 2rem;
+      padding: 2rem;
+      background: #f8f8f8;
     }
-    #qrcode {
-      margin: 1rem auto;
+    .mic-indicator {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0.5rem auto;
     }
-    #share-link {
-      word-break: break-all;
+    .bar {
+      height: 10px;
+      background: green;
+      margin-left: 10px;
+      transition: width 0.1s ease;
     }
   </style>
 </head>
 <body>
-  <h2>🎤 Virtual Karaoke Booth</h2>
-  <p>Scan to join as a mic 🎤:</p>
-  <canvas id="qrcode"></canvas>
-  <p>Or share this link: <br><span id="share-link"></span></p>
-  <p>Waiting for audio...</p>
-
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <h2>🎧 Mic Cast Receiver</h2>
+  <div id="indicators"></div>
   <script>
-    const sessionId = crypto.randomUUID();
+    const sessionId = location.pathname.split('/').pop();
     const ws = new WebSocket(`wss://mic-cast-streamer.onrender.com/${sessionId}`);
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const indicators = {};
 
-    document.getElementById("share-link").innerText =
-      `${location.origin.replace('receiver', 'sender')}?session=${sessionId}`;
-    
-    QRCode.toCanvas(document.getElementById("qrcode"),
-      `${location.origin.replace('receiver', 'sender')}?session=${sessionId}`,
-      { width: 200 },
-      err => {
-        if (err) console.error("QR Code generation error:", err);
-        else console.log("QR code generated!");
-      });
-
-    ws.binaryType = 'arraybuffer';
+    function updateIndicator(name, volume) {
+      if (!indicators[name]) {
+        const el = document.createElement("div");
+        el.className = "mic-indicator";
+        el.innerHTML = `<span>${name}</span><div class="bar" style="width:0px;"></div>`;
+        indicators[name] = el;
+        document.getElementById("indicators").appendChild(el);
+      }
+      const width = Math.min(100, volume * 200);
+      indicators[name].querySelector(".bar").style.width = `${width}px`;
+    }
 
     ws.onmessage = async (event) => {
-      const int16Array = new Int16Array(event.data);
-      const float32Array = new Float32Array(int16Array.length);
-      for (let i = 0; i < int16Array.length; i++) {
-        float32Array[i] = int16Array[i] / 32768;
+      const { name, data } = JSON.parse(event.data);
+      const int16 = new Int16Array(data);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 32768;
       }
 
-      await audioCtx.resume();
-      const buffer = audioCtx.createBuffer(1, float32Array.length, 44100);
-      buffer.copyToChannel(float32Array, 0);
+      // Calculate rough volume
+      const rms = Math.sqrt(float32.reduce((sum, s) => sum + s * s, 0) / float32.length);
+      updateIndicator(name, rms);
 
-      const source = audioCtx.createBufferSource();
+      const buffer = ctx.createBuffer(1, float32.length, 44100);
+      buffer.copyToChannel(float32, 0);
+      const source = ctx.createBufferSource();
       source.buffer = buffer;
-      source.connect(audioCtx.destination);
+      source.connect(ctx.destination);
       source.start();
     };
-
-    ws.onopen = () => console.log("WebSocket connected");
-    ws.onerror = err => console.error("WebSocket error:", err);
   </script>
 </body>
 </html>
