@@ -1,57 +1,54 @@
 const WebSocket = require('ws');
 const express = require('express');
 const http = require('http');
-const url = require('url');
+const { v4: uuidv4 } = require('uuid');
+const cors = require('cors');
 
 const app = express();
+app.use(cors());
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 
-const sessions = {}; // sessionId => Set of clients
+const sessions = {};
 
 server.on('upgrade', (request, socket, head) => {
-  const { query } = url.parse(request.url, true);
-  const sessionId = query.session;
+  const url = new URL(request.url, `http://${request.headers.host}`);
+  const sessionId = url.pathname.split('/')[1];
 
   if (!sessionId) {
     socket.destroy();
     return;
   }
 
-  wss.handleUpgrade(request, socket, head, (ws) => {
-    ws.sessionId = sessionId;
-    wss.emit('connection', ws, request);
-  });
-});
-
-wss.on('connection', (ws) => {
-  const sessionId = ws.sessionId;
-
   if (!sessions[sessionId]) {
     sessions[sessionId] = new Set();
   }
 
-  sessions[sessionId].add(ws);
-  console.log(`Client connected to session: ${sessionId}`);
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    ws.sessionId = sessionId;
+    sessions[sessionId].add(ws);
 
-  ws.on('message', (data) => {
-    for (const client of sessions[sessionId]) {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(data);
+    ws.on('message', (data) => {
+      sessions[sessionId].forEach(client => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(data);
+        }
+      });
+    });
+
+    ws.on('close', () => {
+      sessions[sessionId].delete(ws);
+      if (sessions[sessionId].size === 0) {
+        delete sessions[sessionId];
       }
-    }
-  });
-
-  ws.on('close', () => {
-    sessions[sessionId].delete(ws);
-    if (sessions[sessionId].size === 0) {
-      delete sessions[sessionId];
-    }
-    console.log(`Client disconnected from session: ${sessionId}`);
+    });
   });
 });
 
-app.get('/', (req, res) => res.send('Mic Cast WebSocket Server Running'));
+app.get('/', (req, res) => {
+  res.send('Mic-Cast WebSocket Server Running');
+});
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {

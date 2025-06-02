@@ -2,100 +2,91 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>🎤 Mic Cast Receiver</title>
+  <title>Mic Cast Receiver</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <style>
     body {
       font-family: sans-serif;
-      text-align: center;
       background: #f8f8f8;
-      margin: 0;
+      text-align: center;
       padding: 2rem;
     }
-    canvas {
+    #speakers {
       margin-top: 1rem;
     }
-    #qrcode {
-      margin: 1rem auto;
+    .speaker {
+      margin: 0.25rem;
+      padding: 0.5rem;
+      display: inline-block;
+      border-radius: 4px;
+      background: #eee;
+      font-weight: bold;
     }
-    #link {
+    #qrcode {
       margin: 1rem;
-      word-break: break-all;
-      color: #333;
     }
   </style>
 </head>
 <body>
   <h2>🎧 Mic Cast Receiver</h2>
-  <p>Waiting for audio stream...</p>
   <div id="qrcode"></div>
-  <p id="link"></p>
+  <div><small>Share this link to join: <span id="link"></span></small></div>
+  <div id="speakers"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <script>
-    // Get or generate session ID
-    const urlParams = new URLSearchParams(window.location.search);
-    let sessionId = urlParams.get("session");
+    const params = new URLSearchParams(location.search);
+    let sessionId = params.get("session");
 
     if (!sessionId) {
       sessionId = crypto.randomUUID();
-      const newUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
-      window.history.replaceState({}, "", newUrl);
+      window.location.search = `?session=${sessionId}`;
     }
 
-    // Generate QR code linking to sender page
     const senderUrl = `https://mic-cast-sender.onrender.com/?session=${sessionId}`;
-    QRCode.toCanvas(document.createElement("canvas"), senderUrl, function (err, canvas) {
-      if (err) {
-        console.error("QR Code generation error:", err);
-        return;
-      }
-      document.getElementById("qrcode").appendChild(canvas);
-      document.getElementById("link").textContent = senderUrl;
-      console.log("QR code generated for:", senderUrl);
+    document.getElementById("link").textContent = senderUrl;
+    QRCode.toCanvas(document.getElementById("qrcode"), senderUrl, err => {
+      if (err) console.error("QR Code generation error:", err);
     });
 
-    // Connect to WebSocket with session ID
     const ws = new WebSocket(`wss://mic-cast-streamer.onrender.com/${sessionId}`);
-    ws.binaryType = "arraybuffer";
-
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const sampleRate = 44100;
-    const channelCount = 1;
+    const speakersDiv = document.getElementById("speakers");
+
+    const speakerTimers = {};
+
+    function flashSpeaker(name) {
+      let el = document.getElementById("spk-" + name);
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "speaker";
+        el.id = "spk-" + name;
+        el.textContent = name;
+        speakersDiv.appendChild(el);
+      }
+
+      el.style.background = "#cceeff";
+      clearTimeout(speakerTimers[name]);
+      speakerTimers[name] = setTimeout(() => {
+        el.style.background = "#eee";
+      }, 400);
+    }
 
     ws.onmessage = async (event) => {
-      if (event.data.byteLength % 2 !== 0) {
-        console.warn("Invalid chunk size received:", event.data.byteLength);
-        return;
-      }
-
-      const int16Array = new Int16Array(event.data);
-      console.log("Received chunk of size:", int16Array.length);
-
-      const float32Array = new Float32Array(int16Array.length);
-      for (let i = 0; i < int16Array.length; i++) {
-        float32Array[i] = int16Array[i] / 32768;
-      }
-
       try {
-        await audioCtx.resume();
-        const audioBuffer = audioCtx.createBuffer(channelCount, float32Array.length, sampleRate);
-        audioBuffer.getChannelData(0).set(float32Array);
+        const { name, audio } = JSON.parse(event.data);
+        flashSpeaker(name);
+
+        const float32 = new Float32Array(audio.map(v => v / 32767));
+        const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
+        audioBuffer.getChannelData(0).set(float32);
+
         const source = audioCtx.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioCtx.destination);
         source.start();
-        console.log("Playback started");
-      } catch (err) {
-        console.error("Audio playback error:", err);
+      } catch (e) {
+        console.error("Audio playback error:", e);
       }
-    };
-
-    ws.onopen = () => {
-      console.log("WebSocket connected");
-    };
-
-    ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
     };
   </script>
 </body>
