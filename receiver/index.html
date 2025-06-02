@@ -5,33 +5,15 @@
   <title>Mic Cast Receiver</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      background: #f8f8f8;
-      text-align: center;
-      padding: 2rem;
-    }
-    #speakers {
-      margin-top: 1rem;
-    }
-    .speaker {
-      margin: 0.25rem;
-      padding: 0.5rem;
-      display: inline-block;
-      border-radius: 4px;
-      background: #eee;
-      font-weight: bold;
-    }
-    #qrcode {
-      margin: 1rem;
-    }
+    body { font-family: sans-serif; background: #f8f8f8; text-align: center; padding: 2rem; }
+    #speakers { margin-top: 1rem; }
+    .speaker { margin: 0.25rem; padding: 0.5rem; display: inline-block; border-radius: 4px; background: #eee; font-weight: bold; }
+    #qrcode { margin: 1rem; }
   </style>
 </head>
 <body>
   <h2>🎧 Mic Cast Receiver</h2>
   <canvas id="qrcode"></canvas>
-
-
   <div><small>Share this link to join: <span id="link"></span></small></div>
   <div id="speakers"></div>
 
@@ -53,7 +35,6 @@
     const ws = new WebSocket(`wss://mic-cast-streamer.onrender.com/${sessionId}`);
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const speakersDiv = document.getElementById("speakers");
-
     const speakerTimers = {};
 
     function flashSpeaker(name) {
@@ -65,7 +46,6 @@
         el.textContent = name;
         speakersDiv.appendChild(el);
       }
-
       el.style.background = "#cceeff";
       clearTimeout(speakerTimers[name]);
       speakerTimers[name] = setTimeout(() => {
@@ -74,20 +54,28 @@
     }
 
     ws.onmessage = async (event) => {
-      try {
-        const { name, audio } = JSON.parse(event.data);
-        flashSpeaker(name);
+      const handleData = (json) => {
+        try {
+          const { name, audio } = JSON.parse(json);
+          flashSpeaker(name);
+          const float32 = new Float32Array(audio.map(v => v / 32767));
+          const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
+          audioBuffer.getChannelData(0).set(float32);
+          const source = audioCtx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(audioCtx.destination);
+          source.start();
+        } catch (e) {
+          console.error("Audio playback error:", e);
+        }
+      };
 
-        const float32 = new Float32Array(audio.map(v => v / 32767));
-        const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
-        audioBuffer.getChannelData(0).set(float32);
-
-        const source = audioCtx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioCtx.destination);
-        source.start();
-      } catch (e) {
-        console.error("Audio playback error:", e);
+      if (event.data instanceof Blob) {
+        const reader = new FileReader();
+        reader.onload = () => handleData(reader.result);
+        reader.readAsText(event.data);
+      } else {
+        handleData(event.data);
       }
     };
   </script>
