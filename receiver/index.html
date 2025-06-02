@@ -10,11 +10,26 @@
       margin-top: 2rem;
       background: #f8f8f8;
     }
+    #qr-container {
+      margin-top: 2rem;
+    }
+    #qrcode {
+      display: inline-block;
+      margin-top: 1rem;
+    }
   </style>
 </head>
 <body>
   <h2>🎧 Mic Cast Receiver</h2>
   <p>Waiting for audio stream...</p>
+
+  <div id="qr-container">
+    <p>📱 Scan to join as a mic</p>
+    <div id="qrcode"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
   <script>
     const ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
 
@@ -28,16 +43,13 @@
       const int16Array = new Int16Array(event.data);
       console.log("Received chunk of size:", int16Array.length);
 
-      // Preview first few samples
-      console.log("First 10 samples: ", int16Array.slice(0, 10));
-
       const float32Array = new Float32Array(int16Array.length);
       for (let i = 0; i < int16Array.length; i++) {
         float32Array[i] = int16Array[i] / 32768;
       }
 
       try {
-        await audioCtx.resume(); // Resume to avoid gesture requirement
+        await audioCtx.resume();
 
         const audioBuffer = audioCtx.createBuffer(
           channelCount,
@@ -45,8 +57,6 @@
           sampleRate
         );
         audioBuffer.getChannelData(0).set(float32Array);
-
-        console.log("Decoded audio buffer duration:", audioBuffer.duration);
 
         const source = audioCtx.createBufferSource();
         source.buffer = audioBuffer;
@@ -65,6 +75,17 @@
     ws.onerror = (err) => {
       console.error("WebSocket error:", err);
     };
+
+    // ✅ Generate QR Code
+    const senderURL = "https://mic-cast-sender.onrender.com/";
+    new QRCode(document.getElementById("qrcode"), {
+      text: senderURL,
+      width: 128,
+      height: 128,
+      colorDark: "#000000",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.H
+    });
   </script>
 </body>
 </html>
