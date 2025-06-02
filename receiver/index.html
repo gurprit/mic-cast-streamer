@@ -5,10 +5,53 @@
   <title>Mic Cast Receiver</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <style>
-    body { font-family: sans-serif; background: #f8f8f8; text-align: center; padding: 2rem; }
-    #speakers { margin-top: 1rem; }
-    .speaker { margin: 0.25rem; padding: 0.5rem; display: inline-block; border-radius: 4px; background: #eee; font-weight: bold; }
-    #qrcode { margin: 1rem; }
+    body {
+      font-family: sans-serif;
+      background: #f8f8f8;
+      text-align: center;
+      padding: 2rem 1rem;
+      margin: 0;
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 1.75rem;
+    }
+
+    canvas#qrcode {
+      margin: 1rem auto;
+      display: block;
+      max-width: 200px;
+    }
+
+    #link {
+      word-break: break-word;
+      display: block;
+      margin: 0.5rem auto;
+      max-width: 90%;
+      font-size: 0.9rem;
+      color: #555;
+    }
+
+    #speakers {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .speaker {
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      background: #eee;
+      font-weight: bold;
+      font-size: 0.95rem;
+    }
+
+    .speaking {
+      background-color: #cceeff !important;
+    }
   </style>
 </head>
 <body>
