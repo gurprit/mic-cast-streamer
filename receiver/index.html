@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Mic Cast Receiver</title>
-  <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   <style>
     body {
       font-family: sans-serif;
@@ -11,14 +10,14 @@
       margin-top: 2rem;
       background: #f8f8f8;
     }
-    #status { margin-top: 20px; font-size: 1.2em; }
   </style>
 </head>
 <body>
   <h2>🎧 Mic Cast Receiver</h2>
   <p>Waiting for audio stream...</p>
   <script>
-    const ws = new WebSocket("wss://" + location.hostname + "/stream");
+    const ws = new WebSocket("wss://mic-cast-streamer.onrender.com");
+
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const sampleRate = 44100;
     const channelCount = 1;
@@ -38,8 +37,7 @@
       }
 
       try {
-        // Resume context immediately to avoid gesture requirement on Chromecast
-        await audioCtx.resume();
+        await audioCtx.resume(); // Resume to avoid gesture requirement
 
         const audioBuffer = audioCtx.createBuffer(
           channelCount,
