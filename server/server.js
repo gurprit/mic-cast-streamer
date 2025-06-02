@@ -1,26 +1,44 @@
-// server.js
 const WebSocket = require('ws');
-const express = require('express');
-const http = require('http');
+const { v4: uuidv4 } = require('uuid');
 
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ port: 8080 });
+const sessions = {}; // { sessionId: Set of WebSocket clients }
 
-wss.on('connection', function (ws) {
-  console.log('Client connected');
-  ws.on('message', function (data) {
-    wss.clients.forEach(client => {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(data);
+wss.on('connection', (ws) => {
+  let sessionId = null;
+
+  ws.on('message', (message) => {
+    if (typeof message === 'string') {
+      // Expecting a JSON string with session info
+      try {
+        const data = JSON.parse(message);
+        if (data.type === 'join' && data.sessionId) {
+          sessionId = data.sessionId;
+          if (!sessions[sessionId]) {
+            sessions[sessionId] = new Set();
+          }
+          sessions[sessionId].add(ws);
+          console.log(`Client joined session: ${sessionId}`);
+        }
+      } catch (e) {
+        console.error('Invalid JSON:', e);
       }
-    });
+    } else if (sessionId && sessions[sessionId]) {
+      // Broadcast binary data to all clients in the same session
+      sessions[sessionId].forEach((client) => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
+    }
   });
-});
 
-app.get('/', (req, res) => res.send('WebSocket Server Running'));
-
-const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+  ws.on('close', () => {
+    if (sessionId && sessions[sessionId]) {
+      sessions[sessionId].delete(ws);
+      if (sessions[sessionId].size === 0) {
+        delete sessions[sessionId];
+      }
+    }
+  });
 });
