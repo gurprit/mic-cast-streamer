@@ -2,65 +2,40 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Virtual Karaoke Booth</title>
+  <title>Mic Cast Receiver</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <style>
     body {
       font-family: sans-serif;
       background: #f8f8f8;
       text-align: center;
-      padding: 2rem 1rem;
-      margin: 0;
+      padding: 2rem;
     }
-
-    h2 {
-      margin-top: 0;
-      font-size: 1.75rem;
-    }
-
-    canvas#qrcode {
-      margin: 1rem auto;
-      display: block;
-      max-width: 200px;
-    }
-
-    #link {
-      word-break: break-word;
-      display: block;
-      margin: 0.5rem auto;
-      max-width: 90%;
-      font-size: 0.9rem;
-      color: #555;
-    }
-
     #speakers {
       margin-top: 1rem;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.5rem;
     }
-
     .speaker {
-      padding: 0.4rem 0.75rem;
-      border-radius: 6px;
+      margin: 0.25rem;
+      padding: 0.5rem;
+      display: inline-block;
+      border-radius: 4px;
       background: #eee;
       font-weight: bold;
-      font-size: 0.95rem;
     }
-
-    .speaking {
-      background-color: #cceeff !important;
+    #qrcode {
+      margin: 1rem;
+    }
+    #micCount {
+      font-weight: bold;
+      margin: 0.5rem 0;
     }
   </style>
 </head>
 <body>
-  <h2>Virtual Karaoke Booth</h2>
+  <h2>🎧 Mic Cast Receiver</h2>
   <canvas id="qrcode"></canvas>
   <div><small>Share this link to join: <span id="link"></span></small></div>
-
-  <div id="micCount">🎤 Mics connected: <span id="micNum">0</span></div>
-
+  <div id="micCount">🎤 Connected Mics: 0</div>
   <div id="speakers"></div>
 
   <script>
@@ -74,6 +49,7 @@
 
     const senderUrl = `https://mic-cast-sender.onrender.com/?session=${sessionId}`;
     document.getElementById("link").textContent = senderUrl;
+
     QRCode.toCanvas(document.getElementById("qrcode"), senderUrl, err => {
       if (err) console.error("QR Code generation error:", err);
     });
@@ -81,6 +57,7 @@
     const ws = new WebSocket(`wss://mic-cast-streamer.onrender.com/${sessionId}`);
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const speakersDiv = document.getElementById("speakers");
+    const micCountEl = document.getElementById("micCount");
     const speakerTimers = {};
 
     function flashSpeaker(name) {
@@ -92,6 +69,7 @@
         el.textContent = name;
         speakersDiv.appendChild(el);
       }
+
       el.style.background = "#cceeff";
       clearTimeout(speakerTimers[name]);
       speakerTimers[name] = setTimeout(() => {
@@ -99,56 +77,30 @@
       }, 400);
     }
 
-const micCountSpan = document.getElementById("micNum");
+    ws.onmessage = async (event) => {
+      try {
+        const msg = JSON.parse(event.data);
 
-ws.onmessage = async (event) => {
-  try {
-    const parsed = JSON.parse(event.data);
-
-    if (parsed.type === "meta" && parsed.micCount !== undefined) {
-      micCountSpan.textContent = parsed.micCount;
-      return;
-    }
-
-    const { name, audio } = parsed;
-    flashSpeaker(name);
-
-    const float32 = new Float32Array(audio.map(v => v / 32767));
-    const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
-    audioBuffer.getChannelData(0).set(float32);
-
-    const source = audioCtx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioCtx.destination);
-    source.start();
-  } catch (e) {
-    console.error("Audio playback error:", e);
-  }
-};
-
-      const handleData = (json) => {
-        try {
-          const { name, audio } = JSON.parse(json);
-          flashSpeaker(name);
-          const float32 = new Float32Array(audio.map(v => v / 32767));
-          const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
-          audioBuffer.getChannelData(0).set(float32);
-          const source = audioCtx.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(audioCtx.destination);
-          source.start();
-        } catch (e) {
-          console.error("Audio playback error:", e);
+        if (msg.type === 'meta' && typeof msg.micCount === 'number') {
+          micCountEl.textContent = `🎤 Connected Mics: ${msg.micCount}`;
+          return;
         }
-      };
 
-      if (event.data instanceof Blob) {
-        const reader = new FileReader();
-        reader.onload = () => handleData(reader.result);
-        reader.readAsText(event.data);
-      } else {
-        handleData(event.data);
+        const { name, audio } = msg;
+        flashSpeaker(name);
+
+        const float32 = new Float32Array(audio.map(v => v / 32767));
+        const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
+        audioBuffer.getChannelData(0).set(float32);
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioCtx.destination);
+        source.start();
+      } catch (e) {
+        console.error("Audio playback error:", e);
       }
+    };
   </script>
 </body>
 </html>
