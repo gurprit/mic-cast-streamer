@@ -12,6 +12,22 @@ const wss = new WebSocket.Server({ noServer: true });
 
 const sessions = {};
 
+function broadcastMicCount(sessionId) {
+  const clients = sessions[sessionId] || new Set();
+  const count = clients.size;
+
+  const message = JSON.stringify({
+    type: 'meta',
+    micCount: count,
+  });
+
+  clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}
+
 server.on('upgrade', (request, socket, head) => {
   const url = new URL(request.url, `http://${request.headers.host}`);
   const sessionId = url.pathname.split('/')[1];
@@ -29,7 +45,11 @@ server.on('upgrade', (request, socket, head) => {
     ws.sessionId = sessionId;
     sessions[sessionId].add(ws);
 
+    // Notify all in the session of the new mic count
+    broadcastMicCount(sessionId);
+
     ws.on('message', (data) => {
+      // Broadcast to all other clients in the session
       sessions[sessionId].forEach(client => {
         if (client !== ws && client.readyState === WebSocket.OPEN) {
           client.send(data);
@@ -41,6 +61,8 @@ server.on('upgrade', (request, socket, head) => {
       sessions[sessionId].delete(ws);
       if (sessions[sessionId].size === 0) {
         delete sessions[sessionId];
+      } else {
+        broadcastMicCount(sessionId);
       }
     });
   });

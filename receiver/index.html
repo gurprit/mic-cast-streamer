@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Mic Cast Receiver</title>
+  <title>Virtual Karaoke Booth</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <style>
     body {
@@ -55,9 +55,12 @@
   </style>
 </head>
 <body>
-  <h2>🎧 Mic Cast Receiver</h2>
+  <h2>Virtual Karaoke Booth</h2>
   <canvas id="qrcode"></canvas>
   <div><small>Share this link to join: <span id="link"></span></small></div>
+
+  <div id="micCount">🎤 Mics connected: <span id="micNum">0</span></div>
+
   <div id="speakers"></div>
 
   <script>
@@ -96,7 +99,33 @@
       }, 400);
     }
 
-    ws.onmessage = async (event) => {
+const micCountSpan = document.getElementById("micNum");
+
+ws.onmessage = async (event) => {
+  try {
+    const parsed = JSON.parse(event.data);
+
+    if (parsed.type === "meta" && parsed.micCount !== undefined) {
+      micCountSpan.textContent = parsed.micCount;
+      return;
+    }
+
+    const { name, audio } = parsed;
+    flashSpeaker(name);
+
+    const float32 = new Float32Array(audio.map(v => v / 32767));
+    const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
+    audioBuffer.getChannelData(0).set(float32);
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioCtx.destination);
+    source.start();
+  } catch (e) {
+    console.error("Audio playback error:", e);
+  }
+};
+
       const handleData = (json) => {
         try {
           const { name, audio } = JSON.parse(json);
