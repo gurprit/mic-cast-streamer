@@ -78,29 +78,33 @@
     }
 
     ws.onmessage = async (event) => {
-      try {
-        const msg = JSON.parse(event.data);
+  try {
+    const text = await event.data.text(); // decode Blob to text
+    const msg = JSON.parse(text);
 
-        if (msg.type === 'meta' && typeof msg.micCount === 'number') {
-          micCountEl.textContent = `🎤 Connected Mics: ${msg.micCount}`;
-          return;
-        }
+    if (msg.type === 'meta' && typeof msg.micCount === 'number') {
+      micCountEl.textContent = `🎤 Connected Mics: ${msg.micCount}`;
+      return;
+    }
 
-        const { name, audio } = msg;
-        flashSpeaker(name);
+    const { name, audio } = msg;
+    flashSpeaker(name);
 
-        const float32 = new Float32Array(audio.map(v => v / 32767));
-        const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
-        audioBuffer.getChannelData(0).set(float32);
+    const float32 = new Float32Array(audio.map(v => v / 32767));
+    const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
+    audioBuffer.getChannelData(0).set(float32);
 
-        const source = audioCtx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioCtx.destination);
-        source.start();
-      } catch (e) {
-        console.error("Audio playback error:", e);
-      }
-    };
+    const source = audioCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioCtx.destination);
+    source.start();
+  } catch (e) {
+    console.error("Audio playback error:", e);
+  }
+};
+
+  
+  
   </script>
 </body>
 </html>
