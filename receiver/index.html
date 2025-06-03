@@ -77,10 +77,10 @@
       }, 400);
     }
 
-    ws.onmessage = async (event) => {
+ws.onmessage = async (event) => {
   try {
-    const text = await event.data.text(); // decode Blob to text
-    const msg = JSON.parse(text);
+    const raw = typeof event.data === "string" ? event.data : await event.data.text?.();
+    const msg = JSON.parse(raw);
 
     if (msg.type === 'meta' && typeof msg.micCount === 'number') {
       micCountEl.textContent = `🎤 Connected Mics: ${msg.micCount}`;
@@ -103,8 +103,6 @@
   }
 };
 
-  
-  
   </script>
 </body>
 </html>
