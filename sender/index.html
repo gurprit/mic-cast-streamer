@@ -92,7 +92,9 @@
           audio: Array.from(int16Buffer)
         };
 
-        ws.send(JSON.stringify(message));
+        if (ws.readyState === WebSocket.OPEN) { // Add this check
+          ws.send(JSON.stringify(message));
+        }
       };
     };
   </script>
