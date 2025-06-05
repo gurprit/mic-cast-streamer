@@ -5,9 +5,17 @@
   <title>Mic Cast Sender</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    @font-face {
+      font-family: 'Press Start 2P';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url(https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK0nS.ttf) format('truetype');
+    }
     body {
-      font-family: sans-serif;
-      background: #f0f0f0;
+      font-family: 'Press Start 2P', sans-serif;
+      background: black;
+      color: lime;
       margin: 0;
       padding: 2rem;
       display: flex;
@@ -19,28 +27,32 @@
 
     h2 {
       margin-top: 0;
+      /* font-family: 'Press Start 2P', sans-serif; Ensure h2 inherits the new font */
     }
 
     input, button {
       width: 100%;
       max-width: 320px;
       padding: 0.75rem;
-      font-size: 1rem;
+      font-size: 1rem; /* Retain font-size, adjust if too large with pixel font later */
       margin: 0.5rem 0;
-      border: 1px solid #ccc;
+      border: 1px solid lime;
       border-radius: 8px;
       box-sizing: border-box;
+      font-family: 'Press Start 2P', sans-serif;
+      background-color: black;
+      color: lime;
     }
 
     button {
-      background-color: #007bff;
-      color: white;
-      border: none;
-      font-weight: bold;
+      background-color: #004400; /* Darker Green */
+      color: lime;
+      border: 1px solid lime; /* Ensure button border is also lime */
+      font-weight: bold; /* Retain bold for button text if desired, or set to normal */
     }
 
     button:active {
-      background-color: #0056b3;
+      background-color: #006600; /* Slightly Lighter Green for active */
     }
   </style>
 </head>

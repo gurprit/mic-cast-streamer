@@ -6,9 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <style>
+    @font-face {
+      font-family: 'Press Start 2P';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url(https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK0nS.ttf) format('truetype');
+    }
     body {
-      font-family: sans-serif;
-      background: #f8f8f8;
+      font-family: 'Press Start 2P', sans-serif;
+      background: black;
+      color: lime;
       text-align: center;
       padding: 2rem;
     }
@@ -20,8 +28,10 @@
       padding: 0.5rem;
       display: inline-block;
       border-radius: 4px;
-      background: #eee;
-      font-weight: bold;
+      background: #002200; /* Dark Green */
+      border: 1px solid lime;
+      color: lime;
+      font-weight: normal;
     }
     #qrcode {
       margin: 1rem;
@@ -71,10 +81,10 @@
         speakersDiv.appendChild(el);
       }
 
-      el.style.background = "#cceeff";
+      el.style.background = "#00FF00"; /* Bright Green for flash */
       clearTimeout(speakerTimers[name]);
       speakerTimers[name] = setTimeout(() => {
-        el.style.background = "#eee";
+        el.style.background = "#002200"; /* Reset to Dark Green */
       }, 400);
     }
 
